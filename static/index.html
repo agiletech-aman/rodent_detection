@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Face Detection</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Face Detection</div>
+  <nav id="nav">
+    <a href="#/live" data-page="live">Live</a>
+    <a href="#/cameras" data-page="cameras">Cameras</a>
+    <a href="#/persons" data-page="persons">Persons</a>
+    <a href="#/detections" data-page="detections">Detections</a>
+    <a href="#/rodents" data-page="rodents">Rodents</a>
+    <a href="#/images" data-page="images">Image test</a>
+    <a href="#/settings" data-page="settings">Settings</a>
+  </nav>
+  <div class="sys" id="sys"></div>
+</header>
+<main id="view"></main>
+<div id="modal-root"></div>
+<div id="toasts"></div>
+<div id="zoom" hidden><img alt=""></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

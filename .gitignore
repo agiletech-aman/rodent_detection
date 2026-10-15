@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-train/
+
+# Runtime data: database, people's face photos, detection images, logs (private, never commit)
+data/
+output/
+logs/
+known_faces/
+images/
+
+# Datasets and model files (large; rebuilt with scripts/rodent/, see README "Training the model")
+archive/
+datasets/
+models/
+runs/
+weights/
+*.pt
+*.onnx
+
+# Local secrets
+.env

@@ -1,0 +1,13 @@
+# Python 3.10+ on Ubuntu (x86_64)
+numpy>=1.24,<2.0
+opencv-python>=4.8          # GUI build (needed for --show); see README if imshow fails
+insightface==0.7.3          # SCRFD detector + ArcFace recognition
+# onnxruntime-gpu also contains the CPU provider, so it works on machines without a GPU.
+# Its [cuda,cudnn] extras pull the CUDA 12 / cuDNN 9 runtime from pip (no system CUDA install needed).
+# For a pure-CPU box you can replace this line with:  onnxruntime>=1.18
+onnxruntime-gpu[cuda,cudnn]>=1.21
+PyYAML>=6.0
+requests>=2.31
+fastapi>=0.110          # web UI + REST API
+uvicorn>=0.29
+python-multipart>=0.0.9  # file uploads

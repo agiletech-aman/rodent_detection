@@ -1,0 +1,123 @@
+# =====================================================================
+# Face Detection System - configuration
+# Environment variables are expanded in string values, e.g. ${CAM1_PASS}
+#
+# Cameras, persons and the settings marked [web] are managed from the web UI and
+# stored in the database. The values here are only imported on the FIRST run
+# (empty database). Everything else needs a restart to take effect.
+# =====================================================================
+
+database:
+  path: ./data/app.db         # SQLite: cameras, persons, face embeddings, detection history, settings
+  persons_dir: ./data/persons # uploaded face photos
+
+# [web] First-run import only - afterwards add / edit cameras in the web UI.
+cameras:
+  # Format: rtsp://user:pass@ip:554/stream
+  # Special characters in the password (@ : / #) must be URL-encoded (@ -> %40).
+  - id: cam1
+    url: "rtsp://admin:${CAM1_PASS}@192.168.1.10:554/Streaming/Channels/101"
+    enabled: true
+  - id: cam2
+    url: "rtsp://admin:password@192.168.1.11:554/stream1"
+    enabled: false
+
+rtsp:
+  transport: tcp              # tcp (reliable) | udp (lower latency, may drop packets)
+  frame_skip: 3               # [web] run detection on every N-th frame (1 = every frame)
+  open_timeout_ms: 8000       # max time to open the stream
+  read_timeout_ms: 8000       # max time a single frame read may block
+  max_consecutive_failures: 5 # failed reads before the stream is considered dropped
+  reconnect:
+    max_retries: 0            # consecutive failed reconnects before giving up (0 = retry forever)
+    base_delay: 1.0           # seconds; delay = base_delay * 2^(attempt-1)
+    max_delay: 30.0           # upper cap for the backoff delay
+  display_max_width: 1280     # window is downscaled to this width for --show
+
+detector:
+  model_name: buffalo_l       # buffalo_l (SCRFD-10G, accurate) | buffalo_s (SCRFD-500M, fast on CPU)
+  model_root: ~/.insightface  # models are auto-downloaded here on first run
+  det_size: [960, 736]        # detector input size (multiples of 32); 960x736 fits a 4:3 1280x960 camera and finds
+                              # small far faces (high-mounted CCTV) that 640x640 misses. 640x640 = faster
+  conf_threshold: 0.5         # [web] min detection confidence
+  min_face_size: 20           # [web] ignore faces smaller than this (px, shorter side)
+  device: auto                # auto | cuda | cpu
+
+recognition:
+  enabled: false              # [web] match faces against Persons
+  known_faces_dir: ./known_faces  # first-run import into Persons (name.jpg or name/*.jpg)
+  similarity_threshold: 0.40  # [web] cosine similarity; ArcFace typical range 0.35 - 0.50
+  auto_learn: true            # [web] add confidently recognised faces to the person (better recognition over time)
+  auto_learn_similarity: 0.55 # [web] min similarity to learn a face (keep well above similarity_threshold)
+  auto_learn_max: 30          # [web] auto-learned photos per person; the oldest is replaced when full
+
+output:
+  base_dir: ./output          # faces -> output/faces/<camera_id>/, annotated -> output/annotated/<camera_id>/
+  save_crops: true            # [web]
+  save_annotated: true        # [web]
+  crop_margin: 0.25           # [web] 25% padding: extra context around the face crop (fraction of box size)
+  json_log: ./output/detections.jsonl
+  jpeg_quality: 92
+  # Live streams produce many frames with the same face. Crops / annotated frames /
+  # API posts are rate-limited per camera to one event every N seconds.
+  # The JSON log still gets every detection. 0 = no rate limit.
+  event_interval_sec: 1.0     # [web]
+
+quality:                      # only good faces are saved / posted (others are shown grey in the live view)
+  enabled: true               # [web]
+  min_face_size: 80           # [web] px, shorter side of the face box
+  min_confidence: 0.7         # [web] det_score
+  min_blur_score: 60          # [web] Laplacian variance on the face resized to 112x112 (higher = sharper)
+  max_yaw: 35                 # [web] degrees, left/right head turn (estimated from the 5 landmarks)
+  max_pitch: 30               # [web] degrees, looking up/down
+  require_embedding: true     # [web] store only faces with an ArcFace embedding (Assign person uses it)
+
+dedup:                        # tracker: one best-quality crop per face, no duplicates
+  enabled: true               # [web]
+  best_window_sec: 3          # [web] watch a new face this long, then store its best crop
+  cooldown_sec: 30            # [web] don't store the same person / face again on a camera within this time
+  similarity: 0.45            # [web] embedding similarity to treat a reappearing face as the same track
+
+rodent:                       # rat / mouse detection (YOLO, trained from archive/ by scripts/rodent/)
+  model_path: ./models/rodent.onnx  # restart to load a new model; missing file = feature unavailable
+  enabled: true               # [web]
+  conf_threshold: 0.3         # [web] min box score (0.3 suits the interim YOLO-World model; retune after training)
+  iou_threshold: 0.45         # NMS overlap
+  threads: 2                  # CPU threads for the rodent model (more = faster rodents, slower face detection)
+  frame_skip: 6               # [web] run the rodent model on every N-th frame (~2 runs/s at 12 fps)
+  confirm_hits: 3             # [web] alert only if a rodent is seen in 3 ...
+  confirm_window: 5           # [web] ... of the last 5 runs (filters one-frame false positives)
+  cooldown_sec: 60            # [web] no new alert on the same camera within this time
+
+retention:
+  days: 30                   # [web] delete detection history + images older than this (0 = keep forever)
+
+image:
+  input_path: ./images        # default for --mode image/both if --path is not given
+  recursive: true
+  extensions: [".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"]
+
+api:
+  enabled: false              # [web]
+  url: "http://localhost:8000/api/detections"  # [web]
+  timeout: 5                  # seconds per request
+  max_retries: 3
+  backoff_factor: 0.5         # sleep = backoff_factor * 2^attempt
+  queue_size: 1000            # posts are async; oldest are dropped when the queue is full
+  auth_token: "${API_TOKEN}"  # [web] sent as "Authorization: Bearer <token>"
+
+web:
+  host: 127.0.0.1             # 0.0.0.0 = reachable from other machines on the LAN
+  port: 8080
+  max_fps: 15                 # max live-view frames/s pushed to each browser
+  jpeg_quality: 75
+  max_width: 1280             # live frames are downscaled to this width for the browser
+  max_upload_mb: 15           # per uploaded image
+  username: ""                # set both to require a login (strongly recommended with 0.0.0.0)
+  password: "${WEB_PASS}"
+
+logging:
+  level: INFO                # DEBUG | INFO | WARNING | ERROR
+  file: ./logs/face_detection.log
+  max_bytes: 10485760         # 10 MB per log file
+  backup_count: 5
